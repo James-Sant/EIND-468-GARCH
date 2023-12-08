@@ -1,44 +1,11 @@
-usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>]
-           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
-           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]
-           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]
-           [--config-env=<name>=<envvar>] <command> [<args>]
+# Forecasting volatility with a GARCH model
 
-These are common Git commands used in various situations:
+This analysis looked at how volatility can be modeled and forecasted using a GARCH(1,1) model. The data consisted of the S&P 500 index from January 4, 2010, to November 27, 2023.
 
-start a working area (see also: git help tutorial)
-   clone     Clone a repository into a new directory
-   init      Create an empty Git repository or reinitialize an existing one
+This analysis was motivated by the need to understand, model, and forecast volatility for risk management purposes. It is an important metric for business and individuals to understand - increased volatility and potential losses can cause stress to investors both on a small and large scale.
 
-work on the current change (see also: git help everyday)
-   add       Add file contents to the index
-   mv        Move or rename a file, a directory, or a symlink
-   restore   Restore working tree files
-   rm        Remove files from the working tree and from the index
+GARCH is a common method for modeling volatility. Volatility tends to be conditional heteroskedastic, meaning the variance is non-constant and depends on the previous day. Other models such as ARIMA and exponential smoothing do not account for this non-constant variance. GARCH(1,1) has shown to be particularly effective model. Hansen and Lunde (2004) compared 330 different ARCH type models and found no evidence that any of these models beat a GARCH(1,1) in accuracy. Due to the decreased variables and simplicity of this model, we decided to use a GARCH(1,1) for our analysis.
 
-examine the history and state (see also: git help revisions)
-   bisect    Use binary search to find the commit that introduced a bug
-   diff      Show changes between commits, commit and working tree, etc
-   grep      Print lines matching a pattern
-   log       Show commit logs
-   show      Show various types of objects
-   status    Show the working tree status
+We performed modeling in R utilizing the rugarch package to fit the data. Daily returns were calulcated by taking the log difference between days. The last 29 days of the S&P 500 data was excluded for forecasting testing. Coefficient p-values were found to be significant with more emphasis weighted on the lagged squared volatility as compared to the lagged squared residuals (.80 versus .17). Residual diagnostics failed a normality check which is an assumption of GARCH. Additionally, the forecast test errors were not randomly distributed - our forecast consistently over estimated the actual data. 
 
-grow, mark and tweak your common history
-   branch    List, create, or delete branches
-   commit    Record changes to the repository
-   merge     Join two or more development histories together
-   rebase    Reapply commits on top of another base tip
-   reset     Reset current HEAD to the specified state
-   switch    Switch branches
-   tag       Create, list, delete or verify a tag object signed with GPG
-
-collaborate (see also: git help workflows)
-   fetch     Download objects and refs from another repository
-   pull      Fetch from and integrate with another repository or a local branch
-   push      Update remote refs along with associated objects
-
-'git help -a' and 'git help -g' list available subcommands and some
-concept guides. See 'git help <command>' or 'git help <concept>'
-to read about a specific subcommand or concept.
-See 'git help git' for an overview of the system.
+Our conclusion was that a GARCH(1,1) model does not appear to be the best fit for the S&P 500 data. Other more flexible methods may prove more robust than the GARCH model used. Additionally, the increase volatility post covid may be a factor effecting the reliability of this model.
