@@ -1,0 +1,111 @@
+---
+title: "EIND-468-Final-Report"
+author: "James Santarpio"
+date: "2023-12-08"
+output: html_document
+---
+
+Load in required libraries
+
+```{r}
+library(rugarch)
+library(ggplot2)
+library(tidyverse)
+```
+
+S&P 500 data from Yahoo Finance will be used for this analysis. The closing date will be used to estimate daily returns.
+
+```{r}
+SP500 <- read.csv("S&P500.csv")
+SP500$Date <- as.Date(SP500$Date, format = "%m/%d/%y")
+SP500 <- SP500 %>%
+  select(Date, Close)
+```
+
+```{r}
+ggplot(SP500, aes(x = Date, y = Close, group = 1))+
+  geom_line()+
+  labs(x = "Date", y = "Price", title = "S&P 500")+
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5)) 
+```
+
+There is a clear trend in this index as expected. There appears to be a drop in prices after covid in 2020 as well as additionally increased volatility. Prices recovered quickly after the covid drop, but then decreased again. This increased volatility post 2020 is important to note.
+
+Daily returns calculated as the log of Pt/Pt-1
+
+```{r}
+daily_returns <- SP500 %>%
+  mutate(Close = c(NA, diff(log(Close))))
+colnames(daily_returns)[2] <- "Daily_Returns"
+```
+
+Volatility clustering can be seen in the daily returns data which is a necessary condition for GARCH. Increased volatility post covid is also seen with increased spikes.
+
+```{r}
+ggplot(daily_returns, aes(x = Date, y = Daily_Returns, group=1))+
+  geom_line() + 
+  labs(y = "Daily Returns")+
+  theme_bw()
+
+summary(daily_returns)
+```
+
+Data is split with training data containing all but the last 29 days.
+
+```{r}
+split_date <- as.Date("2023-10-17")
+daily_returns_train <- daily_returns %>%
+  filter(Date <= split_date)
+daily_returns_test <- daily_returns %>%
+  filter(Date > split_date)
+```
+
+Estimate a GARCH(1,1) model with the rugarch package and fit to the training data.
+
+```{r}
+garch_spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
+                         mean.model = list(armaOrder = c(0, 0)))
+garch_fit_1_1 <- ugarchfit(spec = garch_spec, data = na.omit(daily_returns_train))
+
+print(garch_fit_1_1)
+```
+
+GARCH coefficients contain p-values less than .05. The lagged squared residual has less weight compared to the lagged squared volatility with a coefficient of .80 versus .17. 
+
+Observe residual qq line
+
+```{r}
+standardized_residuals <- residuals(garch_fit_1_1, standardize = TRUE)
+
+plot(standardized_residuals, main = "", xlab = "", axes = FALSE)
+qqline(standardized_residuals)
+```
+
+Residuals do not appear normally distributed, an assumption of GARCH. In particular the right side seems to have thick tails. 
+
+Calculate forecast and forecast errors
+
+```{r}
+garch_forecast <- ugarchforecast(garch_fit_1_1, newdata = daily_returns_test, n.ahead = nrow(daily_returns_test))
+forecasted_volatility <- sigma(garch_forecast)
+
+forecast_errors <- daily_returns_test$Daily_Returns - forecasted_volatility
+```
+ 
+Plot the forecasted daily returns for the last 29 days
+
+```{r}
+daily_returns$Forecasted_Returns <- NA
+daily_returns$Forecasted_Returns[1:29] <- rev(forecasted_volatility)
+
+ggplot(head(daily_returns, n = 60), aes(x = Date))+
+  geom_line(aes(y = Daily_Returns, color = "Actual Returns"))+
+  geom_line(aes(y = Forecasted_Returns, color = "Forecasted Returns"))+
+  labs(title = "Daily Returns and Forecasted Values", y = "Values", x = "Date") +
+  scale_color_manual(values = c("Actual Returns" = "blue", "Forecasted Returns" = "red"), guide = "legend") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) 
+```
+
+The daily returns seems to drop off soon after the forecast. The forecast consistently overestimates the actual data. This model appears to not be very reliable for forecasting volatility.
